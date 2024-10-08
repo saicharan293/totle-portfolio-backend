@@ -5,6 +5,12 @@ const bodyParser = require("body-parser");
 const multer = require("multer");
 const app = express();
 const sqlConnect = require("./db/mysql_tp");
+
+const { google } = require("googleapis");
+const OAuth2 = google.auth.OAuth2
+const OAuth2_client = new OAuth2(process.env.CLIENT_ID,process.env.CLIENT_SECRET)
+OAuth2_client.setCredentials({refresh_token: process.env.REFRESH_TOKEN })
+
 require("dotenv").config();
 
 app.use(cors());
@@ -17,29 +23,39 @@ app.get("/", (req, res) => {
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
+    type: 'OAuth2',
     user: process.env.ADMIN_EMAIL,
-    pass: process.env.ADMIN_PASSWORD,
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    refreshToken: process.env.REFRESH_TOKEN,
+    accessToken:null,
   },
 });
+
+
 app.post("/feedback/contact", async (req, res) => {
   const { name, email, message } = req.body;
 
   // Set up email data
-  const mailOptions = {
-    from: process.env.ADMIN_EMAIL,
-    to: [email, process.env.ADMIN_EMAIL],
-    replyTo: process.env.ADMIN_EMAIL,
-    subject: `Contact Form Submission from ${name}`,
-    text: message,
-    html: `<p>${message}</p>`,
-  };
-
   try {
+    const { token: accessToken} = await OAuth2_client.getAccessToken()
+    transporter.options.auth.accessToken = accessToken;
+
+    const mailOptions = {
+      from: process.env.ADMIN_EMAIL,
+      to: [email, process.env.ADMIN_EMAIL],
+      replyTo: process.env.ADMIN_EMAIL,
+      subject: `Contact Form Submission from ${name}`,
+      text: message,
+      html: `<p>${message}</p>`,
+    };
+
     await transporter.sendMail(mailOptions);
-    const inputData = await sqlConnect.query(
+    await sqlConnect.query(
       "INSERT INTO CONTACT_US (name, email, message) VALUES (?, ?, ?)",
       [name, email, message]
     );
+
     res.status(200).send("Email sent and data saved.");
   } catch (error) {
     console.error("Error sending email or saving data:", error);
@@ -72,8 +88,10 @@ app.post("/career/apply", upload.single("resume"), async (req, res) => {
   };
 
   try {
+    const { token: accessToken } = await OAuth2_client.getAccessToken();
+    transporter.options.auth.accessToken = accessToken;
     await transporter.sendMail(mailOptions);
-    const careerQuery = sqlConnect.query(
+    await sqlConnect.query(
       "INSERT INTO CAREERS(name, email, reason) VALUES (?, ?, ?)",
       [name, email, reason]
     );
