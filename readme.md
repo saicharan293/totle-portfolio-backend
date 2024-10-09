@@ -3,7 +3,7 @@ Required installations Before running Backend:
 
     1.Initiate the mysql workbench
     2.npm install => to install node packages
-    3.npm install express nodemon cors body-parser nodemailer dotenv mysql2
+    3.npm install express nodemon cors body-parser nodemailer dotenv mysql2 googleapis
 
 Start the program:
 ------------------
